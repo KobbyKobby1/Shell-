@@ -15,7 +15,7 @@ def find_executable(command):
 def parse_command(input_command):
     """
     Parse the command string, handling both single and double quotes.
-    We preserve backslashes within single quotes.
+    We preserve backslashes within single quotes and correctly handle special characters.
     """
     result = []  # List to hold parsed arguments
     current_arg = []  # List to build the current argument
@@ -44,7 +44,7 @@ def parse_command(input_command):
             # Inside double quotes, preserve everything literally (handled by shlex)
             current_arg.append(char)
         elif char.isspace():
-            # End of an argument
+            # End of an argument, handle special cases like spaces or special characters
             if current_arg:
                 result.append("".join(current_arg))
                 current_arg = []

@@ -10,11 +10,16 @@ def main():
             # Read user input
             command = input().strip()
 
-            # Handle the `exit` command
-            if command == "exit":
-                sys.exit(0)  # Exit with a 0 status code
-            
-            # Handle other commands
+            # Check if the command is `exit` (with or without arguments)
+            if command.startswith("exit"):
+                parts = command.split()
+                if len(parts) > 1 and parts[1].isdigit():
+                    exit_code = int(parts[1])
+                else:
+                    exit_code = 0  # Default to exit code 0
+                sys.exit(exit_code)
+
+            # Handle invalid commands
             if command:
                 print(f"{command}: command not found")
 

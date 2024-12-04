@@ -1,7 +1,7 @@
 import sys
 import os
 import subprocess
-import shlex  # For parsing quoted strings
+import shlex  # For parsing quoted and escaped strings
 
 def main():
     # Define the list of built-in commands
@@ -16,7 +16,7 @@ def main():
             # Read user input
             command = input().strip()
 
-            # Parse input to handle quotes (both single and double)
+            # Parse input while respecting escaping rules
             args = shlex.split(command, posix=True)
 
             if not args:
@@ -78,7 +78,7 @@ def main():
 
             # Handle `echo` command
             elif cmd == "echo":
-                # Join the arguments to preserve spacing within quotes
+                # Join the arguments while preserving escaped spaces
                 print(" ".join(args[1:]))
 
             # Handle running external programs

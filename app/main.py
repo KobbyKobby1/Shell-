@@ -4,7 +4,7 @@ import subprocess
 
 def main():
     # Define the list of built-in commands
-    builtins = {"echo", "exit", "type"}
+    builtins = {"echo", "exit", "type", "pwd"}
 
     while True:
         # Display the shell prompt
@@ -42,6 +42,10 @@ def main():
                     
                     if not found:
                         print(f"{cmd_to_check}: not found")
+
+            # Handle `pwd` command
+            elif command == "pwd":
+                print(os.getcwd())
 
             # Handle `echo` command
             elif command.startswith("echo "):

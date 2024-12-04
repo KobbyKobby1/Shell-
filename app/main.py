@@ -1,6 +1,7 @@
 import sys
 import os
 import subprocess
+import shlex  # For parsing quoted strings
 
 def main():
     # Define the list of built-in commands
@@ -15,19 +16,29 @@ def main():
             # Read user input
             command = input().strip()
 
+            # Parse input to handle quotes
+            args = shlex.split(command)
+
+            if not args:
+                continue  # Skip empty commands
+
+            cmd = args[0]
+
             # Handle `exit` command
-            if command.startswith("exit"):
-                parts = command.split()
-                if len(parts) > 1 and parts[1].isdigit():
-                    exit_code = int(parts[1])
+            if cmd == "exit":
+                if len(args) > 1 and args[1].isdigit():
+                    exit_code = int(args[1])
                 else:
                     exit_code = 0
                 sys.exit(exit_code)
 
             # Handle `type` command
-            elif command.startswith("type "):
-                # Extract the command to check
-                _, cmd_to_check = command.split(maxsplit=1)
+            elif cmd == "type":
+                if len(args) < 2:
+                    print("type: missing operand")
+                    continue
+
+                cmd_to_check = args[1]
                 if cmd_to_check in builtins:
                     print(f"{cmd_to_check} is a shell builtin")
                 else:
@@ -44,13 +55,15 @@ def main():
                         print(f"{cmd_to_check}: not found")
 
             # Handle `pwd` command
-            elif command == "pwd":
+            elif cmd == "pwd":
                 print(os.getcwd())
 
             # Handle `cd` command (absolute, relative paths, and `~`)
-            elif command.startswith("cd "):
-                # Extract the target directory
-                _, target_dir = command.split(maxsplit=1)
+            elif cmd == "cd":
+                if len(args) < 2:
+                    target_dir = os.environ.get("HOME", "/")  # Default to home directory
+                else:
+                    target_dir = args[1]
 
                 # Handle `~` for home directory
                 if target_dir == "~":
@@ -64,33 +77,29 @@ def main():
                     print(f"cd: {target_dir}: Permission denied")
 
             # Handle `echo` command
-            elif command.startswith("echo "):
-                print(command[5:])
+            elif cmd == "echo":
+                # Join the arguments to preserve spacing within quotes
+                print(" ".join(args[1:]))
 
             # Handle running external programs
-            elif command:
-                # Split the command and arguments
-                args = command.split()
-                program = args[0]
-                program_args = args[1:]
-
+            else:
                 # Search for the program in PATH
                 found = False
                 for directory in os.environ["PATH"].split(":"):
-                    program_path = os.path.join(directory, program)
+                    program_path = os.path.join(directory, cmd)
                     if os.path.isfile(program_path) and os.access(program_path, os.X_OK):
                         found = True
                         try:
                             # Run the program with its arguments
-                            result = subprocess.run([program_path] + program_args, capture_output=True, text=True)
+                            result = subprocess.run([program_path] + args[1:], capture_output=True, text=True)
                             # Print the program's output
                             print(result.stdout.strip())
                         except Exception as e:
-                            print(f"Error running {program}: {e}")
+                            print(f"Error running {cmd}: {e}")
                         break
                 
                 if not found:
-                    print(f"{program}: not found")
+                    print(f"{cmd}: not found")
 
         except EOFError:
             # Handle Ctrl+D (EOF)

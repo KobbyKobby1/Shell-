@@ -47,12 +47,12 @@ def main():
             elif command == "pwd":
                 print(os.getcwd())
 
-            # Handle `cd` command
+            # Handle `cd` command (absolute and relative paths)
             elif command.startswith("cd "):
                 # Extract the target directory
                 _, target_dir = command.split(maxsplit=1)
                 try:
-                    os.chdir(target_dir)
+                    os.chdir(target_dir)  # Handles both absolute and relative paths
                 except FileNotFoundError:
                     print(f"cd: {target_dir}: No such file or directory")
                 except PermissionError:

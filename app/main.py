@@ -2,27 +2,28 @@ import sys
 
 def main():
     while True:
-        # Prompt for input
         sys.stdout.write("$ ")
         sys.stdout.flush()
         
         try:
-            # Read user input
             command = input().strip()
-            
-            # Exit condition
-            if command.lower() in ("exit", "quit"):
-                print("Goodbye!")
-                break
-            
-            # Evaluate and print result
+
+            # Handle `exit` with an optional exit code
+            if command.startswith("exit"):
+                parts = command.split()
+                if len(parts) > 1 and parts[1].isdigit():
+                    exit_code = int(parts[1])
+                else:
+                    exit_code = 0  # Default to exit code 0
+                print(f"Exiting the shell with code {exit_code}. Goodbye!")
+                sys.exit(exit_code)
+
             if command:
                 print(f"{command}: command not found")
         
         except EOFError:
-            # Handle EOF (Ctrl+D or similar)
-            print("\nGoodbye!")
-            break
+            print("\nExiting the shell. Goodbye!")
+            sys.exit(0)
 
 if __name__ == "__main__":
     main()

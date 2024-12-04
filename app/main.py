@@ -1,8 +1,8 @@
 import sys
 
 def main():
-    # Define the list of built-in commands
-    builtins = {"echo", "exit"}
+    # Define the list of built-in commands, including 'type'
+    builtins = {"echo", "exit", "type"}
 
     while True:
         # Display the shell prompt

@@ -2,7 +2,7 @@ import sys
 
 def main():
     while True:
-        # Prompt for input
+        # Display the shell prompt
         sys.stdout.write("$ ")
         sys.stdout.flush()
 
@@ -12,8 +12,7 @@ def main():
 
             # Handle the `exit` command
             if command == "exit":
-                print("Exiting the shell. Goodbye!")
-                break
+                sys.exit(0)  # Exit with a 0 status code
             
             # Handle other commands
             if command:
@@ -21,8 +20,7 @@ def main():
 
         except EOFError:
             # Handle Ctrl+D (EOF)
-            print("\nExiting the shell. Goodbye!")
-            break
+            sys.exit(0)
 
 if __name__ == "__main__":
     main()

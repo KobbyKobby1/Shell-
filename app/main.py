@@ -3,84 +3,178 @@ import os
 import subprocess
 import shlex
 
+def find_executable(command):
+    """Search for the command in directories specified by PATH."""
+    path_dirs = os.getenv("PATH", "").split(":")  # Split PATH into directories
+    for directory in path_dirs:
+        executable_path = os.path.join(directory, command)
+        if os.path.isfile(executable_path) and os.access(executable_path, os.X_OK):
+            return executable_path  # Return the first matching executable
+    return None
+
+def parse_command(input_command):
+    """
+    Parse the command string, handling both single and double quotes.
+    We preserve backslashes within single quotes.
+    """
+    result = []  # List to hold parsed arguments
+    current_arg = []  # List to build the current argument
+    in_single_quotes = False  # Flag for single-quoted sections
+    escape_next = False  # Flag for backslash escaping
+
+    i = 0
+    while i < len(input_command):
+        char = input_command[i]
+
+        if in_single_quotes:
+            # Inside single quotes, treat everything literally, including backslashes
+            if char == "'":
+                in_single_quotes = False  # Exit single-quote mode
+            else:
+                current_arg.append(char)
+        elif escape_next:
+            # Handle escaped characters outside quotes
+            current_arg.append(char)
+            escape_next = False
+        elif char == "\\":
+            escape_next = True  # Start escaping the next character
+        elif char == "'":
+            in_single_quotes = True  # Enter single-quote mode
+        elif char == '"':
+            # Inside double quotes, preserve everything literally (handled by shlex)
+            current_arg.append(char)
+        elif char.isspace():
+            # End of an argument
+            if current_arg:
+                result.append("".join(current_arg))
+                current_arg = []
+        else:
+            current_arg.append(char)
+
+        i += 1
+
+    # Add the last argument if any
+    if current_arg:
+        result.append("".join(current_arg))
+
+    return result
+
 def main():
+    # Define a set of shell builtin commands
+    builtins = {"echo", "exit", "type", "pwd", "cd"}
+
     while True:
         sys.stdout.write("$ ")
         sys.stdout.flush()
 
         try:
             # Read user input
-            command = input().strip()
-            if not command:
+            input_command = input().strip()
+            if not input_command:
                 continue
 
-            # Parse the input into arguments
-            args = []
-            i = 0
-            while i < len(command):
-                if command[i] == "'":
-                    # We are inside single quotes
-                    i += 1  # Move past the opening quote
-                    start = i
-                    while i < len(command) and command[i] != "'":
-                        i += 1
-                    if i < len(command):
-                        args.append(command[start:i])  # Add the content inside the quotes
-                    i += 1  # Move past the closing quote
-                elif command[i] == " ":
-                    i += 1  # Skip spaces
-                else:
-                    # Otherwise it's a regular argument
-                    start = i
-                    while i < len(command) and command[i] not in (" ", "'"):
-                        i += 1
-                    args.append(command[start:i])  # Add the argument to the list
+            # Parse the input command
+            parts = parse_command(input_command)
 
-            # Now we have the args
-            cmd = args[0]
+            if not parts:
+                continue
 
-            # Handle the `exit` command
-            if cmd == "exit":
-                exit_code = int(args[1]) if len(args) > 1 and args[1].isdigit() else 0
+            if parts[0] == "exit":
+                exit_code = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 0
                 sys.exit(exit_code)
 
-            # Handle `echo` command
-            elif cmd == "echo":
-                # Handle literal preservation for single quotes
-                output = []
-                for arg in args[1:]:
-                    output.append(arg)  # Add the argument directly, preserving it
-                print(" ".join(output))
-
-            # Handle `cat` command
-            elif cmd == "cat":
-                for file_path in args[1:]:
-                    if file_path.startswith("'") and file_path.endswith("'"):
-                        file_path = file_path[1:-1]  # Strip single quotes from file paths
+            elif parts[0] == "echo":
+                # Handle echo command
+                sys.stdout.write(f"{' '.join(parts[1:])}\n")
+                continue
+            elif parts[0] == "cat":
+                # Run the cat command
+                try:
+                    result = subprocess.run(
+                        parts,  # Use the parsed list directly
+                        check=True,
+                        text=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                    )
+                    sys.stdout.write(result.stdout)
+                    sys.stdout.write(result.stderr)
+                except subprocess.CalledProcessError as e:
+                    sys.stdout.write(e.stderr)
+                continue
+            elif parts[0] == "type":
+                if len(parts) == 2:
+                    queried_command = parts[1]
+                    if queried_command in builtins:
+                        sys.stdout.write(f"{queried_command} is a shell builtin\n")
+                    else:
+                        executable_path = find_executable(queried_command)
+                        if executable_path:
+                            sys.stdout.write(
+                                f"{queried_command} is {executable_path}\n"
+                            )
+                        else:
+                            sys.stdout.write(f"{queried_command}: not found\n")
+                else:
+                    sys.stdout.write("type: usage: type <command>\n")
+                continue
+            elif parts[0] == "pwd":
+                # Print the current working directory
+                sys.stdout.write(f"{os.getcwd()}\n")
+                continue
+            elif parts[0] == "cd":
+                # Handle changing directory
+                if len(parts) == 2:  # Expect exactly one argument
+                    target_dir = parts[1]
+                    # Handle the ~ character
+                    if target_dir.startswith("~"):
+                        home_dir = os.getenv("HOME", "")
+                        if home_dir:
+                            # Replace ~ with the home directory
+                            target_dir = os.path.join(home_dir, target_dir[1:])
+                        else:
+                            sys.stdout.write(
+                                "cd: HOME environment variable is not set\n"
+                            )
+                            continue
                     try:
-                        with open(file_path, "r") as f:
-                            print(f.read().strip(), end=" ")
+                        os.chdir(target_dir)  # Attempt to change the directory
                     except FileNotFoundError:
-                        print(f"{file_path}: No such file or directory")
-                    except PermissionError:
-                        print(f"{file_path}: Permission denied")
-                print()
+                        sys.stdout.write(
+                            f"cd: {target_dir}: No such file or directory\n"
+                        )
+                    except NotADirectoryError:
+                        sys.stdout.write(f"cd: {target_dir}: Not a directory\n")
+                    except Exception as e:
+                        sys.stdout.write(f"cd: {target_dir}: {str(e)}\n")
+                else:
+                    sys.stdout.write("cd: usage: cd <directory>\n")
+                continue
 
             # Handle external commands
-            else:
+            executable_path = find_executable(parts[0])
+            if executable_path:
                 try:
-                    result = subprocess.run(args, capture_output=True, text=True)
-                    print(result.stdout.strip())
-                except FileNotFoundError:
-                    print(f"{cmd}: command not found")
-                except Exception as e:
-                    print(f"Error executing command: {e}")
+                    # Run the external program and print its output
+                    result = subprocess.run(
+                        [executable_path] + parts[1:],
+                        check=True,
+                        text=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                    )
+                    sys.stdout.write(result.stdout)
+                    sys.stdout.write(result.stderr)
+                except subprocess.CalledProcessError as e:
+                    sys.stdout.write(e.stderr)
+                continue
 
+            # Command not found
+            sys.stdout.write(f"{parts[0]}: command not found\n")
         except EOFError:
-            # Exit on EOF (Ctrl+D)
-            sys.exit(0)
-        except Exception as e:
-            print(f"Error: {e}")
+            # Handle EOF (Ctrl+D)
+            break
+    sys.stdout.write("\n")  # Print a newline for a clean exit
 
 if __name__ == "__main__":
     main()

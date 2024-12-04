@@ -1,5 +1,6 @@
 import sys
 import os
+import subprocess
 
 def main():
     # Define the list of built-in commands
@@ -46,9 +47,30 @@ def main():
             elif command.startswith("echo "):
                 print(command[5:])
 
-            # Handle invalid commands
+            # Handle running external programs
             elif command:
-                print(f"{command}: command not found")
+                # Split the command and arguments
+                args = command.split()
+                program = args[0]
+                program_args = args[1:]
+
+                # Search for the program in PATH
+                found = False
+                for directory in os.environ["PATH"].split(":"):
+                    program_path = os.path.join(directory, program)
+                    if os.path.isfile(program_path) and os.access(program_path, os.X_OK):
+                        found = True
+                        try:
+                            # Run the program with its arguments
+                            result = subprocess.run([program_path] + program_args, capture_output=True, text=True)
+                            # Print the program's output
+                            print(result.stdout.strip())
+                        except Exception as e:
+                            print(f"Error running {program}: {e}")
+                        break
+                
+                if not found:
+                    print(f"{program}: not found")
 
         except EOFError:
             # Handle Ctrl+D (EOF)

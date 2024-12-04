@@ -16,7 +16,7 @@ def main():
             # Read user input
             command = input().strip()
 
-            # Parse input while respecting escaping rules
+            # Parse input with shlex (handling quotes and escapes)
             args = shlex.split(command, posix=True)
 
             if not args:
@@ -78,8 +78,30 @@ def main():
 
             # Handle `echo` command
             elif cmd == "echo":
-                # Join the arguments while preserving escaped spaces
-                print(" ".join(args[1:]))
+                # Join the arguments while respecting literal characters in single quotes
+                result = []
+                for arg in args[1:]:
+                    if arg.startswith("'") and arg.endswith("'"):
+                        # Preserve the content literally, stripping surrounding single quotes
+                        result.append(arg[1:-1])
+                    else:
+                        result.append(arg)
+                print(" ".join(result))
+
+            # Handle `cat` command (with backslashes in file paths)
+            elif cmd == "cat":
+                for file_path in args[1:]:
+                    try:
+                        # Handle single-quoted paths
+                        if file_path.startswith("'") and file_path.endswith("'"):
+                            file_path = file_path[1:-1]
+                        with open(file_path, "r") as f:
+                            print(f.read().strip(), end=" ")
+                    except FileNotFoundError:
+                        print(f"{file_path}: No such file or directory")
+                    except PermissionError:
+                        print(f"{file_path}: Permission denied")
+                print()
 
             # Handle running external programs
             else:

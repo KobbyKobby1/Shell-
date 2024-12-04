@@ -16,8 +16,8 @@ def main():
             # Read user input
             command = input().strip()
 
-            # Parse input to handle quotes
-            args = shlex.split(command)
+            # Parse input to handle quotes (both single and double)
+            args = shlex.split(command, posix=True)
 
             if not args:
                 continue  # Skip empty commands

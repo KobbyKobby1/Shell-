@@ -1,6 +1,9 @@
 import sys
 
 def main():
+    # Define the list of built-in commands
+    builtins = {"echo", "exit"}
+
     while True:
         # Display the shell prompt
         sys.stdout.write("$ ")
@@ -19,9 +22,17 @@ def main():
                     exit_code = 0
                 sys.exit(exit_code)
 
+            # Handle `type` command
+            elif command.startswith("type "):
+                # Extract the command to check
+                _, cmd_to_check = command.split(maxsplit=1)
+                if cmd_to_check in builtins:
+                    print(f"{cmd_to_check} is a shell builtin")
+                else:
+                    print(f"{cmd_to_check}: not found")
+
             # Handle `echo` command
             elif command.startswith("echo "):
-                # Extract and print the text after `echo`
                 print(command[5:])
 
             # Handle invalid commands

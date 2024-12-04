@@ -4,7 +4,7 @@ import subprocess
 
 def main():
     # Define the list of built-in commands
-    builtins = {"echo", "exit", "type", "pwd"}
+    builtins = {"echo", "exit", "type", "pwd", "cd"}
 
     while True:
         # Display the shell prompt
@@ -46,6 +46,17 @@ def main():
             # Handle `pwd` command
             elif command == "pwd":
                 print(os.getcwd())
+
+            # Handle `cd` command
+            elif command.startswith("cd "):
+                # Extract the target directory
+                _, target_dir = command.split(maxsplit=1)
+                try:
+                    os.chdir(target_dir)
+                except FileNotFoundError:
+                    print(f"cd: {target_dir}: No such file or directory")
+                except PermissionError:
+                    print(f"cd: {target_dir}: Permission denied")
 
             # Handle `echo` command
             elif command.startswith("echo "):

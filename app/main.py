@@ -79,10 +79,12 @@ def main():
                 result = []
                 for arg in args[1:]:
                     if arg.startswith("'") and arg.endswith("'"):
+                        # Preserve content literally, stripping surrounding single quotes
                         result.append(arg[1:-1].replace("\\'", "'"))  # Handle escaped single quotes
                     else:
                         result.append(arg)
-                print(" ".join(result))
+                # Join without adding extra spaces
+                print("".join(result))
 
             # Handle `cat` command with backslashes in file paths
             elif cmd == "cat":

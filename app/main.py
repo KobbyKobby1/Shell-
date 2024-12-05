@@ -42,7 +42,6 @@ def main():
                 if cmd_to_check in builtins:
                     print(f"{cmd_to_check} is a shell builtin")
                 else:
-                    # Search for the command in the directories listed in PATH
                     found = False
                     for directory in os.environ["PATH"].split(":"):
                         command_path = os.path.join(directory, cmd_to_check)
@@ -65,36 +64,32 @@ def main():
                 else:
                     target_dir = args[1]
 
-                # Handle `~` for home directory
                 if target_dir == "~":
                     target_dir = os.environ.get("HOME", "/")
 
                 try:
-                    os.chdir(target_dir)  # Handles all valid paths
+                    os.chdir(target_dir)
                 except FileNotFoundError:
                     print(f"cd: {target_dir}: No such file or directory")
                 except PermissionError:
                     print(f"cd: {target_dir}: Permission denied")
 
-            # Handle `echo` command
+            # Handle `echo` command with backslashes and single quotes
             elif cmd == "echo":
-                # Join the arguments while respecting literal characters in single quotes
                 result = []
                 for arg in args[1:]:
                     if arg.startswith("'") and arg.endswith("'"):
-                        # Preserve the content literally, stripping surrounding single quotes
-                        result.append(arg[1:-1])
+                        result.append(arg[1:-1].replace("\\'", "'"))  # Handle escaped single quotes
                     else:
                         result.append(arg)
                 print(" ".join(result))
 
-            # Handle `cat` command (with backslashes in file paths)
+            # Handle `cat` command with backslashes in file paths
             elif cmd == "cat":
                 for file_path in args[1:]:
                     try:
-                        # Handle single-quoted paths
                         if file_path.startswith("'") and file_path.endswith("'"):
-                            file_path = file_path[1:-1]
+                            file_path = file_path[1:-1].replace("\\'", "'")  # Handle escaped single quotes
                         with open(file_path, "r") as f:
                             print(f.read().strip(), end=" ")
                     except FileNotFoundError:
@@ -105,16 +100,13 @@ def main():
 
             # Handle running external programs
             else:
-                # Search for the program in PATH
                 found = False
                 for directory in os.environ["PATH"].split(":"):
                     program_path = os.path.join(directory, cmd)
                     if os.path.isfile(program_path) and os.access(program_path, os.X_OK):
                         found = True
                         try:
-                            # Run the program with its arguments
                             result = subprocess.run([program_path] + args[1:], capture_output=True, text=True)
-                            # Print the program's output
                             print(result.stdout.strip())
                         except Exception as e:
                             print(f"Error running {cmd}: {e}")
@@ -124,7 +116,6 @@ def main():
                     print(f"{cmd}: not found")
 
         except EOFError:
-            # Handle Ctrl+D (EOF)
             sys.exit(0)
 
 if __name__ == "__main__":

@@ -79,26 +79,27 @@ def main():
                 result = []
                 for arg in args[1:]:
                     if arg.startswith("'") and arg.endswith("'"):
-                        # Preserve content literally, stripping surrounding single quotes
                         result.append(arg[1:-1].replace("\\'", "'"))  # Handle escaped single quotes
                     else:
                         result.append(arg)
-                # Join without adding extra spaces
-                print("".join(result))
+                print("".join(result))  # Concatenate without spaces
 
             # Handle `cat` command with backslashes in file paths
             elif cmd == "cat":
+                contents = []
                 for file_path in args[1:]:
                     try:
                         if file_path.startswith("'") and file_path.endswith("'"):
                             file_path = file_path[1:-1].replace("\\'", "'")  # Handle escaped single quotes
                         with open(file_path, "r") as f:
-                            print(f.read().strip(), end=" ")
+                            contents.append(f.read().strip())  # Read content and strip whitespace
                     except FileNotFoundError:
                         print(f"{file_path}: No such file or directory")
                     except PermissionError:
                         print(f"{file_path}: Permission denied")
-                print()
+                
+                # Print all contents without additional spaces
+                print("".join(contents))
 
             # Handle running external programs
             else:

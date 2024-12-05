@@ -82,7 +82,7 @@ def main():
                         result.append(arg[1:-1].replace("\\'", "'"))  # Handle escaped single quotes
                     else:
                         result.append(arg)
-                print("".join(result))  # Concatenate without spaces
+                print(" ".join(result))  # Join with spaces
 
             # Handle `cat` command with backslashes in file paths
             elif cmd == "cat":

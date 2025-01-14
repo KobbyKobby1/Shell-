@@ -93,26 +93,28 @@ def main():
                 execute_with_redirect(output)
 
             elif cmd == "cat":
-                output_lines = []
+                output_parts = []
                 
                 for file_path in args[1:]:
                     try:
                         with open(file_path, "r") as f:
                             content = f.read().rstrip('\n')
-                            output_lines.append(content)
+                            output_parts.append(content)
                     except FileNotFoundError:
                         print(f"cat: {file_path}: No such file or directory", file=sys.stderr)
                     except PermissionError:
                         print(f"cat: {file_path}: Permission denied", file=sys.stderr)
                 
-                if output_lines:
+                if output_parts:
+                    output = "".join(output_parts)
                     if redirect_file:
                         os.makedirs(os.path.dirname(redirect_file), exist_ok=True)
                         with open(redirect_file, 'w') as f:
-                            f.write('\n'.join(output_lines))
+                            f.write(output)
                             f.write('\n')
                     else:
-                        print('\n'.join(output_lines))
+                        for i, part in enumerate(output_parts):
+                            print(part, end='\n')
 
             else:
                 try:

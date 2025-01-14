@@ -19,10 +19,8 @@ def main():
             redirect_file = None
             redirect_index = -1
             
-            # Split command but preserve spaces in quotes
             args = shlex.split(command, posix=True)
             
-            # Look for redirection operators
             for i, arg in enumerate(args):
                 if arg in ['>', '1>']:
                     redirect_index = i
@@ -30,7 +28,6 @@ def main():
                         redirect_file = args[i + 1]
                     break
             
-            # Remove redirection parts from args if found
             if redirect_index != -1:
                 args = args[:redirect_index]
             
@@ -45,6 +42,8 @@ def main():
                     try:
                         with open(redirect_file, 'w') as f:
                             f.write(str(output))
+                            if not str(output).endswith('\n'):
+                                f.write('\n')
                     except IOError as e:
                         print(f"Error writing to {redirect_file}: {e}", file=sys.stderr)
                 else:
@@ -93,22 +92,29 @@ def main():
                 execute_with_redirect(output)
 
             elif cmd == "cat":
-                output = []
-                error_occurred = False
+                output_lines = []
+                has_error = False
+                
                 for file_path in args[1:]:
                     try:
                         with open(file_path, "r") as f:
-                            content = f.read()
-                            output.append(content)
+                            content = f.read().rstrip('\n')
+                            if content:
+                                output_lines.append(content)
                     except FileNotFoundError:
                         print(f"cat: {file_path}: No such file or directory", file=sys.stderr)
-                        error_occurred = True
+                        has_error = True
                     except PermissionError:
                         print(f"cat: {file_path}: Permission denied", file=sys.stderr)
-                        error_occurred = True
+                        has_error = True
                 
-                if output and not error_occurred:
-                    execute_with_redirect("".join(output))
+                if output_lines:
+                    if redirect_file:
+                        with open(redirect_file, 'w') as f:
+                            f.write('\n'.join(output_lines))
+                            f.write('\n')
+                    else:
+                        print('\n'.join(output_lines))
 
             else:
                 found = False
@@ -123,9 +129,9 @@ def main():
                                 text=True
                             )
                             if result.stdout:
-                                execute_with_redirect(result.stdout.strip())
+                                execute_with_redirect(result.stdout.rstrip('\n'))
                             if result.stderr:
-                                print(result.stderr.strip(), file=sys.stderr)
+                                print(result.stderr.rstrip('\n'), file=sys.stderr)
                         except Exception as e:
                             print(f"Error running {cmd}: {e}", file=sys.stderr)
                         break

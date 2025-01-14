@@ -16,37 +16,52 @@ def main():
                 continue
 
             # Parse for redirection
-            redirect_file = None
+            redirect_output_file = None
+            redirect_error_file = None
             redirect_index = -1
+            redirect_error_index = -1
             
             args = shlex.split(command, posix=True)
-            
+
+            # Check for output redirection (1> or >)
             for i, arg in enumerate(args):
                 if arg in ['>', '1>']:
                     redirect_index = i
                     if i + 1 < len(args):
-                        redirect_file = args[i + 1]
+                        redirect_output_file = args[i + 1]
                     break
-            
+
+            # Check for error redirection (2>)
+            for i, arg in enumerate(args):
+                if arg == '2>':
+                    redirect_error_index = i
+                    if i + 1 < len(args):
+                        redirect_error_file = args[i + 1]
+                    break
+
             if redirect_index != -1:
                 args = args[:redirect_index]
-            
+            if redirect_error_index != -1:
+                args = args[:redirect_error_index]
+
             if not args:
                 continue
 
             cmd = args[0]
 
             # Function to handle output redirection
-            def execute_with_redirect(output):
-                if redirect_file:
+            def execute_with_redirect(output, file, error=False):
+                if file:
                     try:
-                        os.makedirs(os.path.dirname(redirect_file), exist_ok=True)
-                        with open(redirect_file, 'w') as f:
+                        os.makedirs(os.path.dirname(file), exist_ok=True)
+                        with open(file, 'w') as f:
                             f.write(str(output))
                             if not str(output).endswith('\n'):
                                 f.write('\n')
                     except IOError as e:
-                        print(f"Error writing to {redirect_file}: {e}", file=sys.stderr)
+                        print(f"Error writing to {file}: {e}", file=sys.stderr)
+                elif error:
+                    print(output, file=sys.stderr)
                 else:
                     print(output)
 
@@ -56,7 +71,7 @@ def main():
 
             elif cmd == "type":
                 if len(args) < 2:
-                    print("type: missing operand", file=sys.stderr)
+                    execute_with_redirect("type: missing operand", redirect_error_file, error=True)
                     continue
 
                 cmd_to_check = args[1]
@@ -72,10 +87,10 @@ def main():
                             break
                     if not found:
                         output = f"{cmd_to_check}: not found"
-                execute_with_redirect(output)
+                execute_with_redirect(output, redirect_error_file)
 
             elif cmd == "pwd":
-                execute_with_redirect(os.getcwd())
+                execute_with_redirect(os.getcwd(), redirect_output_file)
 
             elif cmd == "cd":
                 target_dir = args[1] if len(args) > 1 else os.environ.get("HOME", "/")
@@ -84,13 +99,13 @@ def main():
                 try:
                     os.chdir(target_dir)
                 except FileNotFoundError:
-                    print(f"cd: {target_dir}: No such file or directory", file=sys.stderr)
+                    execute_with_redirect(f"cd: {target_dir}: No such file or directory", redirect_error_file, error=True)
                 except PermissionError:
-                    print(f"cd: {target_dir}: Permission denied", file=sys.stderr)
+                    execute_with_redirect(f"cd: {target_dir}: Permission denied", redirect_error_file, error=True)
 
             elif cmd == "echo":
                 output = " ".join(args[1:])
-                execute_with_redirect(output)
+                execute_with_redirect(output, redirect_output_file)
 
             elif cmd == "cat":
                 output_parts = []
@@ -101,19 +116,13 @@ def main():
                             content = f.read().rstrip('\n')
                             output_parts.append(content)
                     except FileNotFoundError:
-                        print(f"cat: {file_path}: No such file or directory", file=sys.stderr)
+                        execute_with_redirect(f"cat: {file_path}: No such file or directory", redirect_error_file, error=True)
                     except PermissionError:
-                        print(f"cat: {file_path}: Permission denied", file=sys.stderr)
+                        execute_with_redirect(f"cat: {file_path}: Permission denied", redirect_error_file, error=True)
                 
                 if output_parts:
                     output = "".join(output_parts)
-                    if redirect_file:
-                        os.makedirs(os.path.dirname(redirect_file), exist_ok=True)
-                        with open(redirect_file, 'w') as f:
-                            f.write(output)
-                            f.write('\n')
-                    else:
-                        print(output, end='\n')
+                    execute_with_redirect(output, redirect_output_file)
 
             else:
                 try:
@@ -123,13 +132,13 @@ def main():
                         text=True
                     )
                     if result.stdout:
-                        execute_with_redirect(result.stdout.rstrip('\n'))
+                        execute_with_redirect(result.stdout.rstrip('\n'), redirect_output_file)
                     if result.stderr:
-                        print(result.stderr.rstrip('\n'), file=sys.stderr)
+                        execute_with_redirect(result.stderr.rstrip('\n'), redirect_error_file, error=True)
                 except FileNotFoundError:
-                    print(f"{cmd}: not found", file=sys.stderr)
+                    execute_with_redirect(f"{cmd}: not found", redirect_error_file, error=True)
                 except Exception as e:
-                    print(f"Error running {cmd}: {e}", file=sys.stderr)
+                    execute_with_redirect(f"Error running {cmd}: {e}", redirect_error_file, error=True)
 
         except EOFError:
             sys.exit(0)

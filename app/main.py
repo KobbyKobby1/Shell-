@@ -113,8 +113,7 @@ def main():
                             f.write(output)
                             f.write('\n')
                     else:
-                        for i, part in enumerate(output_parts):
-                            print(part, end='\n')
+                        print(output, end='\n')
 
             else:
                 try:

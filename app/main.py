@@ -53,7 +53,7 @@ def main():
             def execute_with_redirect(output, file, error=False):
                 if file:
                     try:
-                        os.makedirs(os.path.dirname(file), exist_ok=True)
+                        os.makedirs(os.path.dirname(file), exist_ok=True)  # Ensure parent dirs exist
                         with open(file, 'w') as f:
                             f.write(str(output))
                             if not str(output).endswith('\n'):

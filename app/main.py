@@ -40,6 +40,7 @@ def main():
             def execute_with_redirect(output):
                 if redirect_file:
                     try:
+                        os.makedirs(os.path.dirname(redirect_file), exist_ok=True)
                         with open(redirect_file, 'w') as f:
                             f.write(str(output))
                             if not str(output).endswith('\n'):
@@ -93,23 +94,20 @@ def main():
 
             elif cmd == "cat":
                 output_lines = []
-                has_error = False
                 
                 for file_path in args[1:]:
                     try:
                         with open(file_path, "r") as f:
                             content = f.read().rstrip('\n')
-                            if content:
-                                output_lines.append(content)
+                            output_lines.append(content)
                     except FileNotFoundError:
                         print(f"cat: {file_path}: No such file or directory", file=sys.stderr)
-                        has_error = True
                     except PermissionError:
                         print(f"cat: {file_path}: Permission denied", file=sys.stderr)
-                        has_error = True
                 
                 if output_lines:
                     if redirect_file:
+                        os.makedirs(os.path.dirname(redirect_file), exist_ok=True)
                         with open(redirect_file, 'w') as f:
                             f.write('\n'.join(output_lines))
                             f.write('\n')
@@ -117,27 +115,20 @@ def main():
                         print('\n'.join(output_lines))
 
             else:
-                found = False
-                for directory in os.environ["PATH"].split(":"):
-                    program_path = os.path.join(directory, cmd)
-                    if os.path.isfile(program_path) and os.access(program_path, os.X_OK):
-                        found = True
-                        try:
-                            result = subprocess.run(
-                                [program_path] + args[1:],
-                                capture_output=True,
-                                text=True
-                            )
-                            if result.stdout:
-                                execute_with_redirect(result.stdout.rstrip('\n'))
-                            if result.stderr:
-                                print(result.stderr.rstrip('\n'), file=sys.stderr)
-                        except Exception as e:
-                            print(f"Error running {cmd}: {e}", file=sys.stderr)
-                        break
-                
-                if not found:
+                try:
+                    result = subprocess.run(
+                        args,
+                        capture_output=True,
+                        text=True
+                    )
+                    if result.stdout:
+                        execute_with_redirect(result.stdout.rstrip('\n'))
+                    if result.stderr:
+                        print(result.stderr.rstrip('\n'), file=sys.stderr)
+                except FileNotFoundError:
                     print(f"{cmd}: not found", file=sys.stderr)
+                except Exception as e:
+                    print(f"Error running {cmd}: {e}", file=sys.stderr)
 
         except EOFError:
             sys.exit(0)

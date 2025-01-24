@@ -40,16 +40,20 @@ def main():
     while True:
         generate_prompt()
         # Read user input
-        user_input = input()
-        
-        # Detect tab completion
-        if user_input.endswith("\t"):
-            # Strip the tab and autocomplete the command
-            partial_command = user_input[:-1]
-            completed_command = autocomplete(partial_command)
-            sys.stdout.write(completed_command)  # Display the autocompleted command
-            sys.stdout.flush()
-            continue  # Wait for the user to finish the input
+        user_input = ""
+        while True:
+            char = sys.stdin.read(1)
+            if char == "\t":  # Handle tab completion
+                completed_command = autocomplete(user_input)
+                sys.stdout.write("\r$ " + completed_command)  # Redisplay prompt with completed command
+                sys.stdout.flush()
+                user_input = completed_command
+            elif char == "\n":  # Handle Enter key
+                break
+            else:
+                user_input += char
+                sys.stdout.write(char)
+                sys.stdout.flush()
 
         # Parse command and arguments
         command_args = shlex.split(user_input)

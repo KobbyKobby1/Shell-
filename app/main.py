@@ -45,21 +45,23 @@ def input_completer(text, state):
         tab_state["matches"] = sorted(built_in_matches + path_matches)
 
     # Handle TAB presses
-    if state == 0:
-        if len(tab_state["matches"]) > 1:
+    matches = tab_state["matches"]
+    if len(matches) == 1:
+        # Auto-complete single match
+        return matches[0] + " "
+    elif len(matches) > 1:
+        # Multiple matches: cycle through options on subsequent TAB presses
+        if tab_state["tab_count"] == 0:
+            # First TAB press: Ring the bell
             tab_state["tab_count"] += 1
-            if tab_state["tab_count"] == 1:
-                # First TAB press: Ring the bell
-                sys.stdout.write("\a")
-                sys.stdout.flush()
-            else:
-                # Second TAB press: Display matches
-                print("\n" + "  ".join(tab_state["matches"]))
-                print(f"$ {text}", end="", flush=True)
-        elif len(tab_state["matches"]) == 1:
-            # Auto-complete single match
-            return tab_state["matches"][0] + " "
+            sys.stdout.write("\a")
+            sys.stdout.flush()
+        else:
+            # Second TAB press: Display matches
+            print("\n" + "  ".join(matches))
+            print(f"$ {text}", end="", flush=True)
     return None
+
 
 
 

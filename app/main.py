@@ -10,6 +10,13 @@ def generate_prompt():
 def is_command_builtin(command):
     return command in builtins
 
+def autocomplete(partial_command):
+    # Check for matches in the builtins list
+    matches = [cmd for cmd in builtins if cmd.startswith(partial_command)]
+    if len(matches) == 1:  # Complete if there's exactly one match
+        return matches[0] + " "
+    return partial_command  # Return unchanged if no match or ambiguous
+
 def change_directory(path):
     home = os.environ.get("HOME", "")
     if os.path.exists(path):
@@ -32,7 +39,20 @@ builtins = ["exit", "echo", "type", "pwd", "cd"]
 def main():
     while True:
         generate_prompt()
-        command_args = shlex.split(input())
+        # Read user input
+        user_input = input()
+        
+        # Detect tab completion
+        if user_input.endswith("\t"):
+            # Strip the tab and autocomplete the command
+            partial_command = user_input[:-1]
+            completed_command = autocomplete(partial_command)
+            sys.stdout.write(completed_command)  # Display the autocompleted command
+            sys.stdout.flush()
+            continue  # Wait for the user to finish the input
+
+        # Parse command and arguments
+        command_args = shlex.split(user_input)
         if not command_args:
             continue
         command = command_args[0]
@@ -107,7 +127,6 @@ def main():
                 with open(outfile_path, "a") as file:
                     file.write(out + "\n" if out else "")
                 out = ""
-
 
         # Print output or error
         if err:

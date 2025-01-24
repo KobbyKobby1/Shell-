@@ -100,5 +100,28 @@ def main():
                 stdout.close()
             if stderr_file:
                 stderr.close()
+
+
+
+def input_completer(text, state):
+    # Combine built-ins and executables in PATH
+    built_in_matches = [cmd for cmd in cmd_handlers.keys() if cmd.startswith(text)]
+    path_matches = []
+    path_str = os.environ.get("PATH", "")
+    for path in path_str.split(":"):
+        try:
+            path_matches.extend(
+                cmd for cmd in os.listdir(path)
+                if cmd.startswith(text) and os.access(os.path.join(path, cmd), os.X_OK)
+            )
+        except FileNotFoundError:
+            continue
+
+    all_matches = built_in_matches + path_matches
+    if state < len(all_matches):
+        return all_matches[state] + " "
+    else:
+        return None
+
 if __name__ == "__main__":
     main()

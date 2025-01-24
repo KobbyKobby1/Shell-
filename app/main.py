@@ -8,7 +8,7 @@ def generate_prompt():
     sys.stdout.flush()
 
 def is_command_builtin(command):
-    return command in builtins
+    return command in ["exit", "echo", "type", "pwd", "cd"]
 
 def change_directory(path):
     home = os.environ.get("HOME", "")
@@ -27,55 +27,49 @@ def find_executable(command):
             return file_path
     return None
 
-builtins = ["exit", "echo", "type", "pwd", "cd"]
-
 def main():
     while True:
         generate_prompt()
-        command_args = shlex.split(input())
-        if not command_args:
-            continue
+        command_line = input()
+        command_args = shlex.split(command_line)
         command = command_args[0]
         arguments = command_args[1:]
+        
+        # Handle redirect and append operators
         rdo = None
         outfile_path = None
-
-        # Handle redirection operators
-        if len(arguments) >= 2 and arguments[-2] in [">", "1>", ">>", "1>>", "2>", "2>>"]:
+        append_mode = False
+        
+        # Check for append or write redirect operators
+        if len(arguments) >= 3 and arguments[-2] in [">", "1>", "2>", ">>", "1>>", "2>>"]:
             rdo = arguments[-2]
             outfile_path = arguments[-1]
             arguments = arguments[:-2]
-
+            
+            # Check if it's an append mode
+            append_mode = rdo in [">>", "1>>", "2>>"]
+        
         out, err = "", ""
-
-        # Check if the command is a builtin
-        is_builtin = is_command_builtin(command)
-
-        # Execute command
-        match command:
+        
+        # Execute commands
+        match (command):
             case "pwd":
                 out = f"{os.getcwd()}"
             case "cd":
-                if arguments:
-                    out = change_directory(arguments[0])
-                else:
-                    out = "cd: missing argument"
+                out = change_directory(arguments[0] if arguments else "~")
             case "type":
-                if arguments:
-                    path = find_executable(arguments[0])
-                    is_builtin = is_command_builtin(arguments[0])
-                    if is_builtin:
-                        out = f"{arguments[0]} is a shell builtin"
-                    elif path is not None:
-                        out = f"{arguments[0]} is {path}"
-                    else:
-                        out = f"{arguments[0]}: not found"
+                path = find_executable(arguments[0])
+                if is_command_builtin(arguments[0]):
+                    out = f"{arguments[0]} is a shell builtin"
+                elif path is not None:
+                    out = f"{arguments[0]} is {path}"
                 else:
-                    out = "type: missing argument"
+                    out = f"{arguments[0]}: not found"
             case "echo":
                 out = " ".join(arguments)
             case "exit":
-                sys.exit(0 if not arguments else int(arguments[0]))
+                if not arguments or arguments[0] == "0":
+                    sys.exit()
             case _:
                 if find_executable(command):
                     result = subprocess.run(
@@ -87,30 +81,26 @@ def main():
                     out = result.stdout.rstrip()
                     err = result.stderr.rstrip()
                 else:
-                    err = f"{command}: command not found"
-
-        # Handle redirection to file
+                    out = f"{command}: command not found"
+        
+        # Handle redirection
         if rdo:
-            if rdo == "2>":
-                with open(outfile_path, "w") as file:
-                    file.write(err)
-                err = ""
-            elif rdo == "2>>":
-                with open(outfile_path, "a") as file:
-                    file.write(err)
-                err = ""
-            elif rdo in [">", "1>"]:
-                with open(outfile_path, "w") as file:
-                    file.write(out)
-                out = ""
-            elif rdo in [">>", "1>>"]:
-                with open(outfile_path, "a") as file:
-                    file.write(out)
-                out = ""
-
-        # Print output or error
+            mode = "a" if append_mode else "w"
+            try:
+                if rdo in ["2>>", "2>"]:
+                    with open(outfile_path, mode) as file:
+                        file.write(err)
+                    err = ""
+                elif rdo in [">", "1>", ">>", "1>>"]:
+                    with open(outfile_path, mode) as file:
+                        file.write(out)
+                    out = ""
+            except IOError as e:
+                print(f"Error writing to file: {e}")
+        
+        # Print outputs
         if err:
-            print(err)
+            print(err, file=sys.stderr)
         if out:
             print(out)
 

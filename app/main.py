@@ -11,11 +11,14 @@ def is_command_builtin(command):
     return command in builtins
 
 def autocomplete(partial_command):
-    # Check for matches in the builtins list
-    matches = [cmd for cmd in builtins if cmd.startswith(partial_command)]
-    if len(matches) == 1:  # Complete if there's exactly one match
-        return matches[0] + " "
-    return partial_command  # Return unchanged if no match or ambiguous
+    # Autocomplete for builtin commands
+    builtins_matching = [cmd for cmd in builtins if cmd.startswith(partial_command)]
+    
+    # If exactly one match, return the full command with a space
+    if len(builtins_matching) == 1:
+        return builtins_matching[0] + " "
+    
+    return partial_command
 
 def change_directory(path):
     home = os.environ.get("HOME", "")
@@ -39,28 +42,48 @@ builtins = ["exit", "echo", "type", "pwd", "cd"]
 def main():
     while True:
         generate_prompt()
-        # Read user input
-        user_input = ""
+        
+        # Custom input handling with tab completion
+        current_input = ""
         while True:
             char = sys.stdin.read(1)
-            if char == "\t":  # Handle tab completion
-                completed_command = autocomplete(user_input)
-                sys.stdout.write("\r$ " + completed_command)  # Redisplay prompt with completed command
-                sys.stdout.flush()
-                user_input = completed_command
-            elif char == "\n":  # Handle Enter key
-                break
-            else:
-                user_input += char
+            
+            # Normal character input
+            if char and char != '\t' and char != '\n':
+                current_input += char
                 sys.stdout.write(char)
                 sys.stdout.flush()
-
-        # Parse command and arguments
-        command_args = shlex.split(user_input)
+            
+            # Tab completion
+            elif char == '\t':
+                # Attempt to autocomplete the current input
+                completed_input = autocomplete(current_input)
+                
+                # Clear current line and rewrite with completed input
+                sys.stdout.write('\r$ ' + completed_input)
+                sys.stdout.flush()
+                current_input = completed_input
+            
+            # Enter pressed
+            elif char == '\n':
+                sys.stdout.write('\n')
+                break
+        
+        # Tokenize the input
+        try:
+            command_args = shlex.split(current_input)
+        except ValueError:
+            # Handle invalid input (e.g., unclosed quotes)
+            print("Invalid input")
+            continue
+        
         if not command_args:
             continue
+        
         command = command_args[0]
         arguments = command_args[1:]
+        
+        # Rest of the existing command execution logic remains the same
         rdo = None
         outfile_path = None
 

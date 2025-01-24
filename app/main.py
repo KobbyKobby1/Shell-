@@ -1,165 +1,104 @@
 import sys
 import os
-import subprocess
 import shlex
-
-def generate_prompt():
-    sys.stdout.write("$ ")
-    sys.stdout.flush()
-
-def is_command_builtin(command):
-    return command in builtins
-
-def autocomplete(partial_command):
-    # Autocomplete for builtin commands
-    builtins_matching = [cmd for cmd in builtins if cmd.startswith(partial_command)]
-    
-    # If exactly one match, return the full command with a space
-    if len(builtins_matching) == 1:
-        return builtins_matching[0] + " "
-    
-    return partial_command
-
-def change_directory(path):
-    home = os.environ.get("HOME", "")
-    if os.path.exists(path):
-        os.chdir(path)
-    elif path == "~":
-        os.chdir(home)
+import subprocess
+import readline
+cmd_handlers = {
+    "echo": lambda stdout, stderr, *args: stdout.write(" ".join(args) + "\n"),
+    "pwd": lambda stdout, stderr, *args: stdout.write(os.getcwd() + "\n"),
+    "cd": lambda stdout, stderr, *args: handle_cd(stdout, stderr, *args),
+    "type": lambda stdout, stderr, *args: handle_type(stdout, stderr, *args),
+    "exit": lambda stdout, stderr, *args: exit(int(args[0])) if args else exit(0),
+}
+def input_completer(text, state):
+    options = [cmd for cmd in cmd_handlers.keys() if cmd.startswith(text)]
+    if state < len(options):
+        return options[state] + " "
     else:
-        return f"{path}: No such file or directory"
-
-def find_executable(command):
-    path = os.environ.get("PATH", "")
-    for directory in path.split(":"):
-        file_path = os.path.join(directory, command)
-        if os.path.exists(file_path):
-            return file_path
+        return None
+def find_cmd_in_env_path(cmd):
+    path_str = os.environ.get("PATH")
+    path_list = path_str.split(":")
+    for path in path_list:
+        cmd_path = f"{path}/{cmd}"
+        if os.path.isfile(cmd_path):
+            return cmd_path
     return None
-
-builtins = ["exit", "echo", "type", "pwd", "cd"]
-
+def execute_cmd(cmd, stdout, stderr, *args):
+    if cmd in cmd_handlers.keys():
+        cmd_handlers[cmd](stdout, stderr, *args)
+    else:
+        if find_cmd_in_env_path(cmd):
+            subprocess.run([cmd, *args], stdout=stdout, stderr=stderr)
+        else:
+            sys.stdout.write(f"{cmd}: command not found\n")
+            sys.stdout.flush()
+def handle_type(stdout, stderr, *args):
+    cmd = args[0]
+    if cmd in cmd_handlers.keys():
+        stdout.write(f"{cmd} is a shell builtin\n")
+    else:
+        if cmd_path := find_cmd_in_env_path(cmd):
+            stdout.write(f"{cmd} is {cmd_path}\n")
+        else:
+            stdout.write(f"{cmd}: not found\n")
+def handle_cd(stdout, stderr, *args):
+    if not args:
+        return
+    to_path = args[0]
+    if os.path.isdir(to_path):
+        os.chdir(to_path)
+    elif to_path.strip() == "~":
+        os.chdir(os.environ.get("HOME"))
+    else:
+        stderr.write(f"cd: {to_path}: No such file or directory\n")
 def main():
+    readline.set_completer(input_completer)
+    readline.parse_and_bind("tab: complete")
     while True:
-        generate_prompt()
-        
-        # Custom input handling with tab completion
-        current_input = ""
-        while True:
-            char = sys.stdin.read(1)
-            
-            # Normal character input
-            if char and char != '\t' and char != '\n':
-                current_input += char
-                sys.stdout.write(char)
-                sys.stdout.flush()
-            
-            # Tab completion
-            elif char == '\t':
-                # Attempt to autocomplete the current input
-                completed_input = autocomplete(current_input)
-                
-                # Clear current line and rewrite with completed input
-                sys.stdout.write('\r$ ' + completed_input)
-                sys.stdout.flush()
-                current_input = completed_input
-            
-            # Enter pressed
-            elif char == '\n':
-                sys.stdout.write('\n')
-                break
-        
-        # Tokenize the input
+        input_str = input("$ ")
+        cmd, *args = shlex.split(input_str)
+        stdout_file = None
+        if ">" in args or "1>" in args or ">>" in args or "1>>" in args:
+            index = None
+            mode = "w"
+            if ">" in args:
+                index = args.index(">")
+            elif ">>" in args:
+                index = args.index(">>")
+                mode = "a"
+            elif "1>" in args:
+                index = args.index("1>")
+            elif "1>>" in args:
+                index = args.index("1>>")
+                mode = "a"
+            stdout_file = args[index + 1]
+            args = args[:index] + args[index + 2 :]
+            stdout = open(stdout_file, mode)
+        else:
+            stdout = sys.stdout
+        stderr_file = None
+        if "2>" in args or "2>>" in args:
+            index = None
+            mode = "w"
+            if "2>" in args:
+                index = args.index("2>")
+            elif "2>>" in args:
+                index = args.index("2>>")
+                mode = "a"
+            stderr_file = args[index + 1]
+            args = args[:index] + args[index + 2 :]
+            stderr = open(stderr_file, mode)
+        else:
+            stderr = sys.stderr
         try:
-            command_args = shlex.split(current_input)
-        except ValueError:
-            # Handle invalid input (e.g., unclosed quotes)
-            print("Invalid input")
-            continue
-        
-        if not command_args:
-            continue
-        
-        command = command_args[0]
-        arguments = command_args[1:]
-        
-        # Rest of the existing command execution logic remains the same
-        rdo = None
-        outfile_path = None
-
-        # Handle redirection operators
-        if len(arguments) >= 2 and arguments[-2] in [">", "1>", ">>", "1>>", "2>", "2>>"]:
-            rdo = arguments[-2]
-            outfile_path = arguments[-1]
-            arguments = arguments[:-2]
-
-        out, err = "", ""
-
-        # Check if the command is a builtin
-        is_builtin = is_command_builtin(command)
-
-        # Execute command
-        match command:
-            case "pwd":
-                out = f"{os.getcwd()}"
-            case "cd":
-                if arguments:
-                    out = change_directory(arguments[0])
-                else:
-                    out = "cd: missing argument"
-            case "type":
-                if arguments:
-                    path = find_executable(arguments[0])
-                    is_builtin = is_command_builtin(arguments[0])
-                    if is_builtin:
-                        out = f"{arguments[0]} is a shell builtin"
-                    elif path is not None:
-                        out = f"{arguments[0]} is {path}"
-                    else:
-                        out = f"{arguments[0]}: not found"
-                else:
-                    out = "type: missing argument"
-            case "echo":
-                out = " ".join(arguments)
-            case "exit":
-                sys.exit(0 if not arguments else int(arguments[0]))
-            case _:
-                if find_executable(command):
-                    result = subprocess.run(
-                        [command] + arguments,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        text=True,
-                    )
-                    out = result.stdout.rstrip()
-                    err = result.stderr.rstrip()
-                else:
-                    err = f"{command}: command not found"
-
-        # Handle redirection to file
-        if rdo:
-            if rdo == "2>":
-                with open(outfile_path, "w") as file:
-                    file.write(err + "\n" if err else "")
-                err = ""
-            elif rdo == "2>>":
-                with open(outfile_path, "a") as file:
-                    file.write(err + "\n" if err else "")
-                err = ""
-            elif rdo in [">", "1>"]:
-                with open(outfile_path, "w") as file:
-                    file.write(out + "\n" if out else "")
-                out = ""
-            elif rdo in [">>", "1>>"]:
-                with open(outfile_path, "a") as file:
-                    file.write(out + "\n" if out else "")
-                out = ""
-
-        # Print output or error
-        if err:
-            print(err)
-        if out:
-            print(out)
-
+            execute_cmd(cmd, stdout, stderr, *args)
+        finally:
+            stdout.flush()
+            stderr.flush()
+            if stdout_file:
+                stdout.close()
+            if stderr_file:
+                stderr.close()
 if __name__ == "__main__":
     main()

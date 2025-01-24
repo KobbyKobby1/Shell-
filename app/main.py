@@ -40,7 +40,9 @@ def input_completer(text, state):
                 )
             except FileNotFoundError:
                 continue
-        tab_state["matches"] = built_in_matches + path_matches
+        
+        # Combine and sort matches alphabetically
+        tab_state["matches"] = sorted(built_in_matches + path_matches)
 
     # Handle TAB presses
     if state == 0:
@@ -58,6 +60,7 @@ def input_completer(text, state):
             # Auto-complete single match
             return tab_state["matches"][0] + " "
     return None
+
 
 
 def find_cmd_in_env_path(cmd):
